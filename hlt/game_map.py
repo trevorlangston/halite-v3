@@ -1,4 +1,5 @@
 import queue
+import logging
 
 from . import constants
 from .entity import Entity, Shipyard, Ship, Dropoff
@@ -57,7 +58,6 @@ class Player:
         """
         return ship_id in self._ships
 
-
     @staticmethod
     def _generate():
         """
@@ -87,6 +87,7 @@ class MapCell:
         self.halite_amount = halite_amount
         self.ship = None
         self.structure = None
+        self.safe = True
 
     @property
     def is_empty(self):
@@ -116,13 +117,23 @@ class MapCell:
         """
         return None if not self.structure else type(self.structure)
 
-    def mark_unsafe(self, ship):
+    def mark_unsafe(self):
         """
-        Mark this cell as unsafe (occupied) for navigation.
+        Mark this cell as unsafe for navigation
+        """
+        self.safe = False
 
-        Use in conjunction with GameMap.naive_navigate.
+    def set_ship(self, ship):
+        """
+        Set the ship for this cell
         """
         self.ship = ship
+
+    def move_cost(self):
+        """
+        Get the cost to move from this cell
+        """
+        return self.halite_amount / constants.MOVE_COST_RATIO
 
     def __eq__(self, other):
         return self.position == other.position
@@ -196,6 +207,18 @@ class GameMap:
         return (Direction.South if target.y > source.y else Direction.North if target.y < source.y else None,
                 Direction.East if target.x > source.x else Direction.West if target.x < source.x else None)
 
+    def get_safe_adjacent(self, source):
+        """
+        :param source: The starting position
+        :return: A list of safe adjacent positions.
+        """
+        safe = []
+        for position in source.get_surrounding_cardinals():
+            if self[position].safe:
+                safe.append(self[position])
+
+        return safe
+
     def get_unsafe_moves(self, source, destination):
         """
         Return the Direction(s) to move closer to the target point, or empty if the points are the same.
@@ -262,6 +285,7 @@ class GameMap:
         for y in range(self.height):
             for x in range(self.width):
                 self[Position(x, y)].ship = None
+                self[Position(x, y)].safe = True
 
         for _ in range(int(read_input())):
             cell_x, cell_y, cell_energy = map(int, read_input().split())
