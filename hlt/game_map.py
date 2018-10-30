@@ -255,7 +255,7 @@ class GameMap:
         for direction in self.get_unsafe_moves(ship.position, destination):
             target_pos = ship.position.directional_offset(direction)
             if not self[target_pos].is_occupied:
-                self[target_pos].mark_unsafe(ship)
+                self[target_pos].set_ship(ship)
                 return direction
 
         return Direction.Still
