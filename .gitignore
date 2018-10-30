@@ -2,3 +2,4 @@ replays
 hlt/__pycache__
 *.log
 *.zip
+upload/*

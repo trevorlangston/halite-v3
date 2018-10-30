@@ -248,7 +248,7 @@ def main():
     game = hlt.Game()
     # This is a good place to do computationally expensive start-up pre-processing.
     # As soon as you call "ready" function below, the 2 second per turn timer will start.
-    game.ready("Latest")
+    game.ready("v4")
     brain = Brain(game)
 
     while True:
