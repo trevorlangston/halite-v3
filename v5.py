@@ -22,8 +22,8 @@ class Brain:
         """
         self.game = game
         self.ship_status = {}
+        self.spawn_cutoff = constants.MAX_TURNS * 1/2
         self.return_amount = constants.MAX_HALITE * 0.8
-        self.original_halite = 0
 
     def take_turn(self):
         self.start_turn()
@@ -38,13 +38,6 @@ class Brain:
         self.command_queue = []
         self.is_end_game = False
 
-        # total halite calculations
-        if self.game.turn_number == 1:
-            self.original_halite = self.calculate_halite_remaining()
-
-        self.halite_remaining = self.calculate_halite_remaining()
-
-        # process details of enemies
         self.process_enemies()
 
         # determine if we are in 'endgame'
@@ -53,43 +46,17 @@ class Brain:
         if turns_to_bring_home >= self.turns_left:
             self.is_end_game = True
 
-    def calculate_halite_remaining(self):
-        total = 0
-        for row in range(self.map.height):
-            for col in range(self.map.width):
-                position = Position(row, col)
-                total += self.map[position].halite_amount
-
-        return total
-
     def process_enemies(self):
-        inspired = {}
+        # mark current enemy positions as unsafe
         for player in self.game.players:
             if player is not self.game.my_id:
                 for ship in self.game.players[player].get_ships():
-                    # mark current enemy positions as unsafe
                     self.map[ship].mark_unsafe()
-
-                    #  find inspired positions
-                    for row in range(-constants.INSPIRATION_RADIUS, constants.INSPIRATION_RADIUS):
-                        for col in range(-constants.INSPIRATION_RADIUS, constants.INSPIRATION_RADIUS):
-                            x = ship.position.x + col
-                            y = ship.position.y + row
-                            if (x, y) in inspired:
-                                inspired[(x, y)] += 1
-                            else:
-                                inspired[(x, y)] = 1
-
-        #  marks these cells as being 'inspiring' to ships
-        for x_y_tuple, ship_count in inspired.items():
-            if ship_count >= 2:
-                position = Position(x_y_tuple[0], x_y_tuple[1])
-                self.map[position].mark_inspired()
 
     def spawn(self):
         if (self.me.halite_amount >= constants.SHIP_COST and
                 self.map[self.me.shipyard].safe and
-                self.halite_remaining / self.original_halite > 1/2):
+                self.game.turn_number < self.spawn_cutoff):
             self.command_queue.append(self.me.shipyard.spawn())
             self.map[self.me.shipyard].mark_unsafe()
 
@@ -169,16 +136,10 @@ class Brain:
 
         for row in range(-10, 10):
             for col in range(-10, 10):
-                if col == 0 and row == 0: continue
-
                 pos = Position(ship.position.x + col, ship.position.y + row)
                 dist = self.map.calculate_distance(ship.position, pos)
-                pull = self.map[pos].halite_amount / dist**2
-                if self.map[pos].inspired:
-                    pull *= (constants.INSPIRED_BONUS_MULTIPLIER + 1)
-
                 for move in self.map.get_unsafe_moves(ship.position, pos):
-                    directions[move] += pull
+                    directions[move] += self.map[pos].halite_amount / dist**2
 
         best_safe = None
         while len(directions):
@@ -189,24 +150,14 @@ class Brain:
                 best_safe = cell
                 break
 
-        if best_safe is None:
-            raise ValueError('No safe adjacent positions!')
-
         return best_safe
 
     def explore(self, ship):
         best_cell = self.get_best_dir(ship)
         best_direction = self.map.get_unsafe_moves(ship.position, best_cell.position)[0]
-
-        best_amount = best_cell.halite_amount
-        if best_cell.inspired:
-            best_amount *= (constants.INSPIRED_BONUS_MULTIPLIER + 1)
-
         current_amount = self.map[ship.position].halite_amount
-        if self.map[ship.position].inspired:
-            current_amount *= (constants.INSPIRED_BONUS_MULTIPLIER + 1)
 
-        move_outlook = best_amount / 4 - self.map[ship].move_cost()
+        move_outlook = best_cell.halite_amount / 4 - self.map[ship].move_cost()
         stay_outlook = current_amount - (current_amount * 3/4 * 3/4)
         should_move = move_outlook >= stay_outlook
 
@@ -266,6 +217,9 @@ class Brain:
     def get_min_safe_adjacent(self, ship):
         return self.get_best_adjacent(ship, False)
 
+    #  def get_max_safe_adjacent(self, ship):
+    #      return self.get_best_adjacent(ship, True)
+
     def get_random_safe(self, ship):
         return random.choice(self.map.get_safe_adjacent(ship.position))
 
@@ -291,7 +245,6 @@ class Brain:
             try:
                 position, direction = self.get_move(ship)
             except Exception:
-                logging.info(Exception)
                 position = ship.position
                 direction = Direction.Still
 
@@ -314,7 +267,7 @@ def main():
     game = hlt.Game()
     # This is a good place to do computationally expensive start-up pre-processing.
     # As soon as you call "ready" function below, the 2 second per turn timer will start.
-    game.ready("Latest")
+    game.ready("v5")
     brain = Brain(game)
 
     while True:

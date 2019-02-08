@@ -88,6 +88,7 @@ class MapCell:
         self.ship = None
         self.structure = None
         self.safe = True
+        self.inspired = False
 
     @property
     def is_empty(self):
@@ -122,6 +123,12 @@ class MapCell:
         Mark this cell as unsafe for navigation
         """
         self.safe = False
+
+    def mark_inspired(self):
+        """
+        Mark this cell as inspiring
+        """
+        self.inspired = True
 
     def set_ship(self, ship):
         """
@@ -286,6 +293,7 @@ class GameMap:
             for x in range(self.width):
                 self[Position(x, y)].ship = None
                 self[Position(x, y)].safe = True
+                self[Position(x, y)].inspired = False
 
         for _ in range(int(read_input())):
             cell_x, cell_y, cell_energy = map(int, read_input().split())

@@ -22,8 +22,8 @@ class Brain:
         """
         self.game = game
         self.ship_status = {}
+        self.spawn_cutoff = constants.MAX_TURNS * 1/2
         self.return_amount = constants.MAX_HALITE * 0.8
-        self.original_halite = 0
 
     def take_turn(self):
         self.start_turn()
@@ -38,13 +38,6 @@ class Brain:
         self.command_queue = []
         self.is_end_game = False
 
-        # total halite calculations
-        if self.game.turn_number == 1:
-            self.original_halite = self.calculate_halite_remaining()
-
-        self.halite_remaining = self.calculate_halite_remaining()
-
-        # process details of enemies
         self.process_enemies()
 
         # determine if we are in 'endgame'
@@ -52,15 +45,6 @@ class Brain:
         turns_to_bring_home = int(len(self.me.get_ships()) / len(self.get_all_dropoffs()))
         if turns_to_bring_home >= self.turns_left:
             self.is_end_game = True
-
-    def calculate_halite_remaining(self):
-        total = 0
-        for row in range(self.map.height):
-            for col in range(self.map.width):
-                position = Position(row, col)
-                total += self.map[position].halite_amount
-
-        return total
 
     def process_enemies(self):
         inspired = {}
@@ -89,7 +73,7 @@ class Brain:
     def spawn(self):
         if (self.me.halite_amount >= constants.SHIP_COST and
                 self.map[self.me.shipyard].safe and
-                self.halite_remaining / self.original_halite > 1/2):
+                self.game.turn_number < self.spawn_cutoff):
             self.command_queue.append(self.me.shipyard.spawn())
             self.map[self.me.shipyard].mark_unsafe()
 
@@ -314,8 +298,15 @@ def main():
     game = hlt.Game()
     # This is a good place to do computationally expensive start-up pre-processing.
     # As soon as you call "ready" function below, the 2 second per turn timer will start.
-    game.ready("Latest")
+    game.ready("v6")
     brain = Brain(game)
+
+    logging.info(constants.INSPIRATION_RADIUS)
+    logging.info(constants.INSPIRATION_ENABLED)
+    logging.info(constants.INSPIRATION_SHIP_COUNT)
+    logging.info(constants.INSPIRED_EXTRACT_RATIO)
+    logging.info(constants.INSPIRED_BONUS_MULTIPLIER)
+    logging.info(constants.INSPIRED_MOVE_COST_RATIO)
 
     while True:
         brain.take_turn()
